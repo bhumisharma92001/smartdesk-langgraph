@@ -6,8 +6,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from custom_exception.exceptions import ToolAuthError  # noqa: E402
-from tools.search import web_search  # noqa: E402
+from custom_exception.exceptions import ToolAuthError  
+from tools.search import web_search 
 
 
 def test_web_search_raises_without_api_key(monkeypatch):

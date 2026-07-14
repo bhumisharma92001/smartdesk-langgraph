@@ -1,11 +1,9 @@
-"""Test: graph must be runnable via both invoke() and stream() (spec constraint)."""
-
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from graph import build_smoke_graph  # noqa: E402
+from graph import build_smoke_graph 
 
 STATE = {
     "messages": [{"role": "user", "content": "hello smartdesk"}],

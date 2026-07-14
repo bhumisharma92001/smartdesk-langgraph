@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-
+from typing import Optional
 
 class CalculatorInput(BaseModel):
     """Input schema for the calculator tool."""
@@ -15,3 +15,15 @@ class WebSearchInput(BaseModel):
 class FetchPageInput(BaseModel):
     url: str = Field(..., description="The URL to fetch and extract text from.")
     max_chars: int = Field(3000, ge=500, le=10000, description="Max characters of extracted text to return.")
+
+class SaveNoteInput(BaseModel):
+    """Input schema for the save_note tool."""
+
+    title: str = Field(..., description="Short title for the note.")
+    content: str = Field(..., description="The note's body text.")
+    tags: list[str] = Field(default_factory=list, description="Optional tags for later filtering.")
+
+class ListNotesInput(BaseModel):
+    """Input schema for the list_notes tool."""
+
+    tag_filter: Optional[str] = Field(None, description="If set, only return notes with this tag.")
