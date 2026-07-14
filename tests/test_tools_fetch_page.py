@@ -1,5 +1,3 @@
-"""Test 6 of 6+: tool schemas — covers fetch_page's success and error paths."""
-
 import sys
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -8,8 +6,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from custom_exception.exceptions import ToolExecutionError  # noqa: E402
-from tools.fetch_page import fetch_page  # noqa: E402
+from custom_exception.exceptions import ToolExecutionError 
+from tools.fetch_page import fetch_page  
 
 
 def test_fetch_page_strips_html_to_text():

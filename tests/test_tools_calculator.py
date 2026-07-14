@@ -1,12 +1,10 @@
-"""Test 4 of 6+: tool schemas — covers the 'tool schemas' test category."""
-
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from custom_exception.exceptions import ToolExecutionError, ToolInputError
-from tools.calculator import calculator  # noqa: E402
+from tools.calculator import calculator  
 
 
 def test_calculator_returns_correct_result():
