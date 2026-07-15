@@ -17,10 +17,9 @@ def _validate_url(url: str) -> None:
         raise ToolInputError(f"Only http/https URLs are allowed, got: {url!r}")
 
 
-def _fetch_html(url: str, http_get: Optional[Callable[..., requests.Response]] = None) -> str:
-    getter = http_get if http_get is not None else requests.get
+def _fetch_html(url: str) -> str:
     try:
-        resp = getter(url, headers=_HEADERS, timeout=10)
+        resp = requests.get(url, headers=_HEADERS, timeout=10)
         resp.raise_for_status()
     except requests.RequestException as exc:
         raise ToolExecutionError(f"fetch_page failed for {url!r}: {exc}") from exc
