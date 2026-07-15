@@ -25,28 +25,27 @@ class SmartDeskStore: #Instead of every tool interacting directly with LangGraph
         notes = [item.value for item in self._backend.search(("notes", user_id))]
         return [n for n in notes if tag_filter in n["tags"]] if tag_filter else notes
 
-    def create_task(self, user_id: str, title: str, steps: list[str]) -> str:
-        """Create a task with ordered steps and return its generated task_id."""
-        task_id = str(uuid.uuid4())
-        task = {"task_id": task_id, "title": title, "status": "in_progress",
-                "steps": [{"description": s, "done": False} for s in steps]}
-        self._backend.put(("tasks", user_id), task_id, task)
-        return task_id
-
-    def get_task(self, user_id: str, task_id: str) -> dict[str, Any]:
-        """Fetch a task by id; raises KeyError if it doesn't exist for this user."""
-        item = self._backend.get(("tasks", user_id), task_id)
+    def save_draft(self, user_id: str, topic: str, content: str, format: str, tone: str) -> str:
+        """Save a new drafted document and return its generated doc_id."""
+        doc_id = str(uuid.uuid4())
+        draft = {
+            "doc_id": doc_id, "topic": topic, "content": content,
+            "format": format, "tone": tone, "revisions": [],
+        }
+        self._backend.put(("drafts", user_id), doc_id, draft)
+        return doc_id
+ 
+    def get_draft(self, user_id: str, doc_id: str) -> dict[str, Any]:
+        """Fetch a draft by id; raises KeyError if it doesn't exist for this user."""
+        item = self._backend.get(("drafts", user_id), doc_id)
         if item is None:
-            raise KeyError(f"No task {task_id!r} for user {user_id!r}")
+            raise KeyError(f"No draft {doc_id!r} for user {user_id!r}")
         return item.value
-
-    def mark_step_done(self, user_id: str, task_id: str, step_index: int) -> dict[str, Any]:
-        """Mark one step done, auto-completing the task once all steps are done."""
-        task = self.get_task(user_id, task_id)
-        steps = task["steps"]
-        if not 0 <= step_index < len(steps):
-            raise IndexError(f"step_index {step_index} out of range (has {len(steps)} steps)")
-        steps[step_index]["done"] = True
-        task["status"] = "completed" if all(s["done"] for s in steps) else "in_progress"
-        self._backend.put(("tasks", user_id), task_id, task)
-        return task
+ 
+    def revise_draft(self, user_id: str, doc_id: str, new_content: str, instruction: str) -> dict[str, Any]:
+        """Replace a draft's content, keeping a log of the instruction that produced the revision."""
+        draft = self.get_draft(user_id, doc_id)
+        draft["revisions"].append({"instruction": instruction, "previous_content": draft["content"]})
+        draft["content"] = new_content
+        self._backend.put(("drafts", user_id), doc_id, draft)
+        return draft
