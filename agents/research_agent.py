@@ -6,7 +6,7 @@ from langchain_core.messages import ToolMessage
 from langchain_core.tools import ToolException
 from langchain_groq import ChatGroq
 from langgraph.store.base import BaseStore
-import traceback
+
 from state import GlobalState
 from tools.fetch_page import fetch_page
 from tools.notes import save_note
@@ -67,10 +67,9 @@ def research_agent_node(state: GlobalState, store: BaseStore, max_retries: int =
         except ToolException as exc:
             return {"error": f"ResearchAgent tool failure: {exc}"}
         except Exception as exc:
-            traceback.print_exc()   # <-- add this
-            return {
-                "error": f"ResearchAgent failed: {type(exc).__name__}: {exc}"
-            }
+            if _TRANSIENT_ERROR_MARKER in str(exc) and attempt < max_retries:
+                continue
+            return {"error": f"ResearchAgent failed: {type(exc).__name__}: {exc}"}
 
     new_messages = result["messages"][len(state["messages"]):]
 

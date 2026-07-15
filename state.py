@@ -33,4 +33,5 @@ class GlobalState(TypedDict):
     completed_tasks: Annotated[list, operator.add]
     memories: Annotated[list[str], add_unique]
     summary: str
+    writer_output: str
     error: Optional[str]
