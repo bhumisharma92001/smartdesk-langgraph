@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SmartDesk</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="shell">
+    <header><div><h1>SmartDesk</h1><p>Research, write, plan, and remember.</p></div><button id="newChat">New chat</button></header>
+    <section id="login" class="login"><h2>Welcome</h2><p>Enter a username. This browser will securely remember your generated user ID.</p><form id="loginForm"><input id="username" maxlength="50" placeholder="Username" required /><button>Continue</button></form></section>
+    <section id="chat" class="chat hidden"><div id="messages" class="messages"></div><form id="chatForm"><textarea id="prompt" rows="2" placeholder="Ask SmartDesk…" required></textarea><button>Send</button></form></section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
