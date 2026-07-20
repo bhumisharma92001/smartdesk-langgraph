@@ -1,84 +1,77 @@
-"""Manual live check for ResearchAgent -- real GROQ + TAVILY calls, no mocks.
-Run directly: python test_live.py
-Requires GROQ_API_KEY and TAVILY_API_KEY set in .env.
-"""
-from dotenv import load_dotenv
-load_dotenv()
+"""Low-cost live smoke test for Supervisor -> ResearchAgent.
 
-import os
+Run directly (not collected by pytest):
+    .\\venv\\Scripts\\python.exe test_research.py
+
+Uses real OpenRouter and Tavily credentials from .env. Expected paid work is one
+supervisor decision, one web search, and the ResearchAgent's short tool loop.
+"""
+import re
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.store.memory import InMemoryStore
 
-from agents.research_agent import research_agent_node
+from graph import build_graph
 from state import GlobalState
 
 
-def make_state(text: str) -> GlobalState:
+SMOKE_QUERY = (
+    "Research the current stable Python release. In at most 3 bullets, give its "
+    "version and release date, with URLs for python.org and one other credible "
+    "source. Do not save a note."
+)
+
+
+def make_state() -> GlobalState:
     return GlobalState(
-        messages=[HumanMessage(content=text)],
-        user_id="test-user-1",
+        messages=[HumanMessage(content=SMOKE_QUERY)],
+        user_id="research-smoke-test",
         active_agent=None,
         task_queue=[],
         completed_tasks=[],
-        memories=[],
         summary="",
+        research_summary="",
+        writer_output="",
+        task_output="",
+        routing_log=[],
         error=None,
     )
 
 
-def print_trace(messages) -> None:
-    for m in messages:
-        if isinstance(m, AIMessage) and m.tool_calls:
-            for tc in m.tool_calls:
-                print(f"  [TOOL CALL] {tc['name']}({tc['args']})")
-        elif isinstance(m, ToolMessage):
-            tag = "  <ERROR>" if m.status == "error" else ""
-            print(f"  [TOOL RESULT{tag}] {m.name}: {str(m.content)[:200]}")
-        elif isinstance(m, AIMessage) and m.content:
-            print(f"  [AI FINAL] {str(m.content)[:300]}")
-
-
-def case_real_search() -> None:
-    """Prompts a real research request; expects at least web_search to run,
-    and a note to be persisted as a result."""
-    print("=== Case 1: real web search ===")
+def main() -> None:
     store = InMemoryStore()
-    state = make_state(
-        "Search the web for today's top headline on LangChain's official "
-        "blog, save it as a note, and tell me the title and URL."
+    result = build_graph(store=store).invoke(make_state())
+
+    route = result.get("active_agent")
+    trace = result.get("routing_log", [])
+    tool_messages = [m for m in result["messages"] if isinstance(m, ToolMessage)]
+    tool_names = [m.name for m in tool_messages]
+    answer = result.get("research_summary", "")
+    urls = set(re.findall(r"https?://[^\s)>\]]+", answer))
+
+    print(f"query: {SMOKE_QUERY}")
+    print(f"supervisor route: {route}")
+    print(f"routing log: {trace}")
+    print(f"tools used: {tool_names}")
+    print(f"answer: {answer}")
+
+    assert result.get("error") is None, result.get("error")
+    assert route == "research", f"Supervisor misrouted request to {route!r}"
+    assert trace and trace[-1].get("fallback") is False, "Supervisor used fallback routing"
+    assert tool_names.count("web_search") == 1, (
+        f"Expected exactly one web_search, got {tool_names}"
     )
-    patch = research_agent_node(state, store=store)
+    assert "save_note" not in tool_names, "Smoke test should not spend a note-save call"
+    assert answer, "ResearchAgent returned no research_summary"
+    assert len(urls) >= 2, f"Expected at least two cited URLs, got {sorted(urls)}"
+    assert any(isinstance(m, AIMessage) and m.content for m in result["messages"])
 
-    print_trace(patch.get("messages", []))
-    print("summary:", patch.get("summary"))
-    print("error:", patch.get("error"))
-    assert patch["error"] is None, f"Expected no error, got: {patch['error']}"
-
-    tool_called = any(isinstance(m, ToolMessage) for m in patch.get("messages", []))
-    assert tool_called, "Expected at least one real tool call"
-
-    saved = list(store.search(("notes", "test-user-1")))
-    assert saved, "Expected save_note to have written a note"
-    print(">>> PASS: real search + save_note confirmed end-to-end.")
-
-
+    print("\nPASS: supervisor routed to ResearchAgent; one search returned cited research.")
 
 
 if __name__ == "__main__":
-    cases = [("Case 1", case_real_search)]
-    results = {}
-
-    for name, fn in cases:
-        try:
-            fn()
-            results[name] = "PASS"
-        except AssertionError as exc:
-            results[name] = f"FAIL: {exc}"
-        except Exception as exc:
-            results[name] = f"ERROR: {exc}"
-        print()
-
-    print("=== Summary ===")
-    for name, status in results.items():
-        print(f"{name}: {status}")
+    main()

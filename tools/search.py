@@ -1,4 +1,5 @@
 import os
+from typing import TypedDict
 
 import requests
 from langchain_core.tools import tool
@@ -7,16 +8,22 @@ from custom_exception.exceptions import ToolAuthError, ToolExecutionError
 from tools.schemas import WebSearchInput
 
 _TAVILY_URL = "https://api.tavily.com/search"
+_MAX_SNIPPET_CHARS = 500
+
+
+class SearchResult(TypedDict):
+    title: str
+    url: str
+    snippet: str
 
 
 @tool("web_search", args_schema=WebSearchInput)
-def web_search(query: str, max_results: int = 5) -> list[dict]:
+def web_search(query: str, max_results: int = 5) -> list[SearchResult]:
     """Search the web via Tavily and return the top matching results.
 
     Use this when a task requires current or factual information that
-    is not already present in the conversation, e.g. news, documentation,
-    or general research queries. Follow up with fetch_page on a promising
-    URL if you need the full page content rather than just a snippet.
+    is not already present in the conversation. The returned snippets
+    and URLs are the complete research context for the agent.
 
     Args:
         query: The search query.
@@ -41,10 +48,14 @@ def web_search(query: str, max_results: int = 5) -> list[dict]:
             timeout=10,
         )
         resp.raise_for_status()
-    except requests.RequestException as exc:
+        data = resp.json()
+        return [
+            {
+                "title": r["title"],
+                "url": r["url"],
+                "snippet": r.get("content", "")[:_MAX_SNIPPET_CHARS],
+            }
+            for r in data.get("results", [])
+        ]
+    except (requests.RequestException, ValueError, KeyError, TypeError) as exc:
         raise ToolExecutionError(f"web_search failed: {exc}") from exc
-
-    return [
-        {"title": r["title"], "url": r["url"], "snippet": r.get("content", "")}
-        for r in resp.json().get("results", [])
-    ]
