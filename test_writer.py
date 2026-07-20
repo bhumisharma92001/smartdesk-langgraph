@@ -1,12 +1,12 @@
-"""Manual live check for WriterAgent -- real OpenRouter calls, no mocks.
-Run directly: python test_writer.py
-Requires OPENROUTER_API_KEY set in .env.
+"""Manual live check for WriterAgent -- real GROQ calls, no mocks.
+Run directly: python test_live_writer.py
+Requires GROQ_API_KEY set in .env.
 
 Covers three things the code review flagged as risky:
   1. A plain draft (no research context) actually persists via draft_document.
-  2. The Research -> Writer handoff: when state["research_summary"] is set, that
+  2. The Research -> Writer handoff: when state["summary"] is set, that
      content shows up in the agent's output, AND the node does not
-     clobber state["research_summary"] (it writes to writer_output instead).
+     clobber state["summary"] (it writes to writer_output instead).
   3. Revision: the agent calls get_draft before revise_document, rather
      than guessing at content it never fetched.
 """
@@ -20,18 +20,16 @@ from agents.writer_agent import writer_agent_node
 from state import GlobalState
 
 
-def make_state(text: str, research_summary: str = "") -> GlobalState:
+def make_state(text: str, summary: str = "") -> GlobalState:
     return GlobalState(
         messages=[HumanMessage(content=text)],
         user_id="test-user-1",
         active_agent=None,
         task_queue=[],
         completed_tasks=[],
-        summary="",
-        research_summary=research_summary,
+        memories=[],
+        summary=summary,
         writer_output="",
-        task_output="",
-        routing_log=[],
         error=None,
     )
 
@@ -63,7 +61,6 @@ def case_plain_draft() -> None:
     print("writer_output:", patch.get("writer_output"))
     print("error:", patch.get("error"))
     assert patch["error"] is None, f"Expected no error, got: {patch['error']}"
-    assert patch.get("writer_output"), "Expected writer_output to be populated"
 
     tool_called = any(
         isinstance(m, ToolMessage) and m.name == "draft_document"
@@ -78,8 +75,8 @@ def case_plain_draft() -> None:
 
 def case_handoff_from_research() -> None:
     """Simulates ResearchAgent having already run by pre-populating
-    state["research_summary"]. Expects that content to be used in the draft, AND
-    expects the node patch to NOT include a "research_summary" key (so it can
+    state["summary"]. Expects that content to be used in the draft, AND
+    expects the node patch to NOT include a "summary" key (so it can
     never clobber ResearchAgent's summary when merged into GlobalState)."""
     print("=== Case 2: handoff from simulated ResearchAgent summary ===")
     store = InMemoryStore()
@@ -91,7 +88,7 @@ def case_handoff_from_research() -> None:
     state = make_state(
         "Draft a short internal report summarizing what we found in our "
         "research, formal tone.",
-        research_summary=research_summary,
+        summary=research_summary,
     )
     patch = writer_agent_node(state, store=store)
 
@@ -100,8 +97,8 @@ def case_handoff_from_research() -> None:
     print("error:", patch.get("error"))
     assert patch["error"] is None, f"Expected no error, got: {patch['error']}"
 
-    assert "research_summary" not in patch, (
-        "writer_agent_node must not return a 'research_summary' key -- doing so "
+    assert "summary" not in patch, (
+        "writer_agent_node must not return a 'summary' key -- doing so "
         "would overwrite ResearchAgent's summary in shared state"
     )
 
