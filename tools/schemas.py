@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+from typing import Optional
 
 class CalculatorInput(BaseModel):
     """Input schema for the calculator tool."""
@@ -11,12 +12,21 @@ class WebSearchInput(BaseModel):
     query: str = Field(..., description="The search query.")
     max_results: int = Field(5, ge=1, le=20, description="Maximum number of results to return.")
 
+class FetchPageInput(BaseModel):
+    url: str = Field(..., description="The URL to fetch and extract text from.")
+    max_chars: int = Field(3000, ge=500, le=10000, description="Max characters of extracted text to return.")
+
 class SaveNoteInput(BaseModel):
     """Input schema for the save_note tool."""
 
     title: str = Field(..., description="Short title for the note.")
     content: str = Field(..., description="The note's body text.")
     tags: list[str] = Field(default_factory=list, description="Optional tags for later filtering.")
+
+class ListNotesInput(BaseModel):
+    """Input schema for the list_notes tool."""
+
+    tag_filter: Optional[str] = Field(None, description="If set, only return notes with this tag.")
 
 class DraftDocumentInput(BaseModel):
     """Input schema for the draft_document tool."""
@@ -37,20 +47,3 @@ class ReviseDocumentInput(BaseModel):
     doc_id: str = Field(..., description="The id of the draft to revise.")
     new_content: str = Field(..., description="The full revised document text.")
     instruction: str = Field(..., description="The edit instruction that was applied.")
-
-class CreateTaskInput(BaseModel):
-    """Input schema for the create_task tool."""
-
-    title: str = Field(..., description="Short title for the task.")
-    steps: list[str] = Field(..., min_length=1, description="Ordered actionable steps.")
-
-class GetTaskInput(BaseModel):
-    """Input schema for the get_task tool."""
-
-    task_id: str = Field(..., description="The id of the task to retrieve.")
-
-class MarkStepDoneInput(BaseModel):
-    """Input schema for the mark_step_done tool."""
-
-    task_id: str = Field(..., description="The id of the task.")
-    step_index: int = Field(..., ge=0, description="Zero-based index of the step to mark done.")
