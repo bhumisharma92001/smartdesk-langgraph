@@ -1,58 +1,44 @@
+"""Shared LangGraph state."""
 import operator
 from typing import Annotated
-
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
 from typing_extensions import TypedDict
 
 
-class TaskStep(TypedDict):
-    description: str
-    done: bool
+def merge_error(left: str | None, right: str | None) -> str | None:
+    """Combine failures produced by concurrent agent branches."""
+    if right is None: return None
+    return f"{left}; {right}" if left else right
 
 
-class TaskRecord(TypedDict):
-    task_id: str
-    title: str
-    status: str
-    steps: list[TaskStep]
-
-
-def update_task_queue(left: list[TaskRecord], right: list[TaskRecord]) -> list[TaskRecord]:
-    """Upsert active tasks and remove completed ones."""
-    queue = {t["task_id"]: t for t in left}
+def merge_tasks(left: list[dict], right: list[dict]) -> list[dict]:
+    """Upsert pending tasks and remove tasks completed by TaskAgent."""
+    tasks = {task["task_id"]: task for task in left}
     for task in right:
-        if task.get("status") == "completed":
-            queue.pop(task.get("task_id"), None)
-        else:
-            queue[task["task_id"]] = task
-    return list(queue.values())
+        if task.get("status") == "completed": tasks.pop(task["task_id"], None)
+        else: tasks[task["task_id"]] = task
+    return list(tasks.values())
 
 
-def merge_errors(left: str | None, right: str | None) -> str | None:
-    """Clear at turn start or combine concurrent branch failures.
-
-    Successful nodes must omit the error key so a parallel success cannot
-    erase another branch's failure.
-    """
-    if right is None:
-        return None
-    if left and left != right:
-        return f"{left}; {right}"
-    return right
+def reset_or_add(left: list[dict], right: list[dict] | None) -> list[dict]:
+    """Append concurrent turn data, or explicitly clear transient data."""
+    return [] if right is None else left + right
 
 
-class GlobalState(TypedDict):
-    """Shared state threaded through every node in the SmartDesk graph."""
-
+class GlobalState(TypedDict, total=False):
+    """State shared by the supervisor and all sub-agents."""
     messages: Annotated[list[BaseMessage], add_messages]
     user_id: str
     active_agent: str | None
-    task_queue: Annotated[list[TaskRecord], update_task_queue]
-    completed_tasks: Annotated[list[TaskRecord], operator.add]
+    turn_id: str
+    task_queue: Annotated[list[dict], merge_tasks]
+    completed_tasks: Annotated[list[dict], operator.add]
+    current_document: dict | None
+    last_note_list: list[dict]
+    agent_outputs: Annotated[list[dict], reset_or_add]
+    monitor_log: Annotated[list[dict], reset_or_add]
+    memories: list[str]
+    new_memories: list[str]
     summary: str
-    research_summary: str
-    writer_output: str
-    task_output: str
-    routing_log: Annotated[list[dict], operator.add]
-    error: Annotated[str | None, merge_errors]
+    error: Annotated[str | None, merge_error]
