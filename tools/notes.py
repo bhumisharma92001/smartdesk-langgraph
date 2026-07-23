@@ -10,10 +10,15 @@ from tools.schemas import ListNotesInput, SaveNoteInput
 
 @tool("save_note", args_schema=SaveNoteInput)
 def save_note(title: str, content: str, tags: list[str],
+              messages: Annotated[list, InjectedState("messages")],
               user_id: Annotated[str, InjectedState("user_id")],
               store: Annotated[BaseStore, InjectedStore()]) -> str:
     """Persist a structured note when findings should survive the current turn."""
     try:
+        latest = next((str(getattr(message, "content", "")) for message in reversed(messages)
+                       if getattr(message, "type", "") == "human"), "")
+        if not re.search(r"\b(note|save|remember|record)\b", latest, re.I):
+            raise ValueError("the current user request did not authorize saving a note")
         existing = [item.value for item in store.search(("notes", user_id))]
         normalized = re.sub(r"[^a-z0-9]+", " ", title.casefold()).strip()
         duplicate = next((note for note in existing

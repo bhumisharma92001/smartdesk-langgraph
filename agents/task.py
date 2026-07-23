@@ -2,10 +2,13 @@
 import json
 from langgraph.store.base import BaseStore
 from agents.base import build, run
+from observability import log
 from state import GlobalState
 from tools.notes import save_note, list_notes
 from tools.calculator import calculator
-from tools.tasks import create_task, mark_step_done
+from tools.tasks import create_task, mark_step_done, render_tasks
+
+logger = log("task")
 
 
 def build_task(store: BaseStore):
@@ -37,12 +40,22 @@ def run_task(state: GlobalState, agent) -> dict:
         if message.name not in {"create_task", "mark_step_done"}: continue
         task = getattr(message, "artifact", None)
         if not isinstance(task, dict):
-            try: task = json.loads(str(message.content))
-            except (json.JSONDecodeError, TypeError): invalid = True; continue
+            try:
+                task = json.loads(str(message.content))
+            except (json.JSONDecodeError, TypeError) as exc:
+                logger.warning("invalid task artifact | tool=%s error=%s content=%r",
+                               message.name, type(exc).__name__,
+                               str(message.content)[:200])
+                invalid = True
+                continue
         if "task_id" in task: tasks.append(task)
+    tasks = list({task["task_id"]: task for task in tasks}.values())
     saved = {t["task_id"] for t in state.get("completed_tasks", [])}
     completed = [t for t in tasks if t.get("status") == "completed" and t["task_id"] not in saved]
-    if tasks: patch["task_queue"] = tasks
+    if tasks:
+        patch["task_queue"] = tasks
+        if patch.get("agent_outputs"):
+            patch["agent_outputs"][0]["content"] = render_tasks(tasks)
     if completed: patch["completed_tasks"] = completed
     if invalid: patch["error"] = "Task tool returned an invalid state artifact"
     return patch

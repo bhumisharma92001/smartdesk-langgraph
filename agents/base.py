@@ -1,7 +1,7 @@
 """Small shared agent runner."""
 from langchain.agents import AgentState, create_agent
 from langchain.agents.middleware import ToolRetryMiddleware
-from langchain_core.messages import SystemMessage, ToolMessage
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import ToolException
 from langgraph.store.base import BaseStore
 from contracts import AgentReport, cited_urls
@@ -32,8 +32,12 @@ def run(state: GlobalState, agent, name: str) -> tuple[dict, list[ToolMessage]]:
         context = [SystemMessage(content=(f"Earlier summary: {state.get('summary', '')}\n"
                   f"Relevant memories: {state.get('memories', [])}\n"
                   f"Active tasks: {state.get('task_queue', [])}\n"
-                  f"Current canonical document: {state.get('current_document')}"))]
-        result = agent.invoke({"messages": context + state["messages"], "user_id": state["user_id"]},
+                  f"Current canonical document: {state.get('current_document')}\n"
+                  f"Current-turn specialist results: "
+                  f"{[x for x in state.get('agent_outputs', []) if x.get('turn_id') == state.get('turn_id')]}"))]
+        latest = next(message for message in reversed(state["messages"])
+                      if isinstance(message, HumanMessage))
+        result = agent.invoke({"messages": context + [latest], "user_id": state["user_id"]},
                               {"recursion_limit": 20})
         tools_used = [m for m in result["messages"] if isinstance(m, ToolMessage)]
         output = result["messages"][-1]

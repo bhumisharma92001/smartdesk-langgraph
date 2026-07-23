@@ -43,13 +43,20 @@ def create_task(title: str, steps: list[str],
 
 @tool("mark_step_done", args_schema=MarkStepDoneInput, response_format="content_and_artifact")
 def mark_step_done(task_id: str, step_index: int,
+                   messages: Annotated[list, InjectedState("messages")],
                    user_id: Annotated[str, InjectedState("user_id")],
                    store: Annotated[BaseStore, InjectedStore()]) -> tuple[str, dict]:
     """Mark one specific task step complete after the user reports completion."""
     try:
+        latest = next((str(getattr(message, "content", "")) for message in reversed(messages)
+                       if getattr(message, "type", "") == "human"), "")
+        if not re.search(r"\b(mark|done|complete|completed|finish|finished)\b", latest, re.I):
+            raise ValueError("the current user request did not authorize completing a task step")
         item = store.get(("tasks", user_id), task_id)
         if item is None: raise KeyError(task_id)
         task = item.value
+        if step_index < 0 or step_index >= len(task["steps"]):
+            raise ValueError(f"step_index {step_index} out of range")
         task["steps"][step_index]["done"] = True
         task["status"] = "completed" if all(s["done"] for s in task["steps"]) else "in_progress"
         store.put(("tasks", user_id), task_id, task, index=False); return json.dumps(task), task

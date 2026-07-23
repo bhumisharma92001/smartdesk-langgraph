@@ -1,7 +1,10 @@
 """Layer 1: in-context conversation memory."""
 from langchain_core.messages import HumanMessage, RemoveMessage, SystemMessage
 from models import model
+from observability import log
 from state import GlobalState
+
+logger = log("memory.context")
 
 def trim_history(state: GlobalState) -> dict:
     """Summarise old history after 12 user turns and keep the latest six."""
@@ -17,7 +20,11 @@ def trim_history(state: GlobalState) -> dict:
     previous = state.get("summary", "")
     prompt = (f"Previous summary:\n{previous}\n\nMerge in these newer facts, "
               f"decisions, and preferences concisely:\n{transcript}")
-    try: summary = str(model().invoke([SystemMessage(prompt)]).content)
-    except Exception: summary = transcript[-2000:]
+    try:
+        summary = str(model().invoke([SystemMessage(prompt)]).content)
+    except Exception as exc:
+        logger.warning("history summarization failed; using truncation | error=%s: %s",
+                       type(exc).__name__, exc)
+        summary = transcript[-2000:]
     return {"summary": summary,
             "messages": [RemoveMessage(id=m.id) for m in old]}

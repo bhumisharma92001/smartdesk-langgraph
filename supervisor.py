@@ -35,6 +35,10 @@ PLANNER_PROMPT = (
     "TaskAgent. Include task only when the user also asks to create, track, update, or manage a "
     "task/checklist. Route saving, listing, showing, retrieving, or identifying notes to task; do not call "
     "research merely to read saved notes. Never add an agent merely because it might be useful. "
+    "Saving findings as a note during an explicit research request belongs to ResearchAgent and "
+    "must not add task. Existing active tasks are background only: do not select task unless the "
+    "current message asks about tasks, steps, checklists, or notes. Questions about the user's "
+    "identity, preferences, or remembered facts are chat. "
     "For memories, extract only explicit, durable facts about the user that will help in future "
     "conversations: identity, preferences, stable constraints, relationships, or long-term goals. "
     "Represent each memory with type, key, and value fields. "
@@ -65,7 +69,9 @@ class Plan(BaseModel):
 
     workflow: Workflow = Field(description=(
         "Use task for every note operation, including showing a note by UUID. "
-        "Use show_document only for the current WriterAgent document."
+        "Saving findings within a research request is handled by research and does not add task. "
+        "Use show_document only for the current WriterAgent document. Identity and remembered-fact "
+        "questions are chat."
     ))
     memories: list[MemoryFact] = Field(default_factory=list)
 

@@ -27,6 +27,7 @@ def build_writer(store: BaseStore):
 def run_writer(state: GlobalState, agent) -> dict:
     """Draft or revise a document using prior research messages."""
     patch, results = run(state, agent, "writer")
+    document_used = False
     for message in reversed(results):
         if not isinstance(message, ToolMessage) or message.name not in {
                 "draft_document", "revise_document"}:
@@ -37,5 +38,8 @@ def run_writer(state: GlobalState, agent) -> dict:
             except (json.JSONDecodeError, TypeError): continue
         if "doc_id" in document and "content" in document:
             patch["current_document"] = {**document, "turn_id": state["turn_id"]}
+            document_used = True
             break
+    if not document_used and not patch.get("error"):
+        patch["error"] = "WriterAgent did not persist a document"
     return patch
